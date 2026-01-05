@@ -63,6 +63,7 @@
         <!-- 标签页导航 -->
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('dashboard')">仪表盘</button>
+            <button class="tab-btn" onclick="switchTab('client-summary')">客户汇总</button>
             <button class="tab-btn" onclick="switchTab('income-records')">收入记录</button>
             <button class="tab-btn" onclick="switchTab('payment-logs')">结款日志</button>
             <button class="tab-btn" onclick="switchTab('expense-management')">支出管理</button>
@@ -112,14 +113,6 @@
                 </h2>
                 <div class="summary-container" id="storeDetails">
                     <!-- 店面明细将通过JavaScript动态添加 -->
-                </div>
-            </div>
-            
-            <!-- 客户汇总 -->
-            <div class="summary-section" id="clientSummarySection">
-                <h2>客户汇总</h2>
-                <div class="summary-container" id="clientSummary">
-                    <!-- 客户汇总将通过JavaScript动态添加 -->
                 </div>
             </div>
             
@@ -236,6 +229,17 @@
             </div>
         </div>
         
+        <!-- 客户汇总标签页内容 -->
+        <div id="client-summary" class="tab-content">
+            <!-- 客户汇总 -->
+            <div class="summary-section" id="clientSummarySection">
+                <h2>客户汇总</h2>
+                <div class="summary-container" id="clientSummary">
+                    <!-- 客户汇总将通过JavaScript动态添加 -->
+                </div>
+            </div>
+        </div>
+        
         <!-- 收入记录标签页内容 -->
         <div id="income-records" class="tab-content">
             <!-- 记录列表 -->
@@ -261,7 +265,7 @@
                     <button class="toggle-btn" onclick="togglePaymentLogs()">▼</button>
                 </div>
                 <div id="paymentLogsContainer" class="collapsible-content">
-                    <div class="summary-container" id="paymentLogs">
+                    <div id="paymentLogs">
                         <!-- 结款变动日志将通过JavaScript动态添加 -->
                     </div>
                 </div>
@@ -270,6 +274,17 @@
         
         <!-- 支出管理标签页内容 -->
         <div id="expense-management" class="tab-content">
+            <!-- 年度支出总计 -->
+            <div class="summary-section">
+                <h2>年度支出总计</h2>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">年度支出总计</span>
+                        <span class="stat-value" id="annualExpenseTotal">¥0.00</span>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 支出记录表单 -->
             <div class="form-section">
                 <div class="collapsible-header">
@@ -306,14 +321,6 @@
                     <button class="toggle-btn" onclick="toggleExpenseSummary()">▼</button>
                 </div>
                 <div id="expenseSummaryContainer" class="collapsible-content">
-                    <!-- 年度支出总计 -->
-                    <div class="stats" style="margin-bottom: 20px;">
-                        <div class="stat-item">
-                            <span class="stat-label">年度支出总计</span>
-                            <span class="stat-value" id="annualExpenseTotal">¥0.00</span>
-                        </div>
-                    </div>
-                    
                     <!-- 月度支出汇总 -->
                     <h3 style="color: #34495e; margin-bottom: 15px; font-size: 18px;">月度支出汇总</h3>
                     <div class="summary-container" id="monthlyExpenses">
