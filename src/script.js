@@ -721,7 +721,8 @@ function displayIncomeRecords(records) {
             </div>
             
             ${record.note ? `<div class="record-note">${record.note}</div>` : ''}
-            <div class="record-actions">
+            <div class="record-actions" style="display: flex; gap: 5px;">
+                <button class="btn btn-small btn-edit" onclick="shareRecord('${record.id}')">分享记录</button>
                 <button class="btn btn-small btn-edit" onclick="editIncomeRecord('${record.id}')">编辑</button>
                 <button class="btn btn-small btn-delete" onclick="deleteIncomeRecord('${record.id}')">删除</button>
             </div>
@@ -1346,7 +1347,7 @@ function shareBrandDetails(brand) {
     } catch (err) {
         showNotification('复制失败，请手动复制以下内容');
         // 显示文本供用户手动复制
-        showModal('品牌明细', `<pre style="white-space: pre-wrap;">${shareText}</pre>`, null, null, true);
+        showModal('品牌明细', `<pre style="white-space: pre-wrap;">${shareText}</pre>`, null, null, false);
     }
     
     document.body.removeChild(textarea);
@@ -1391,7 +1392,7 @@ function shareRecord(id) {
     } catch (err) {
         showNotification('复制失败，请手动复制以下内容');
         // 显示文本供用户手动复制
-        showModal('安装记录', `<pre style="white-space: pre-wrap;">${shareText}</pre>`, null, null, true);
+        showModal('安装记录', `<pre style="white-space: pre-wrap;">${shareText}</pre>`, null, null, false);
     }
     
     document.body.removeChild(textarea);
@@ -1463,8 +1464,9 @@ function updateClientSummary(records) {
                     <span class="summary-value balance-positive">¥${client.balance.toFixed(2)}</span>
                 </div>
             </div>
-            <div class="summary-actions">
-                <button class="btn btn-small btn-edit" onclick="editClientPayment('${client.client}', ${client.payment}, ${client.totalAmount})">修改结款</button>
+            <div class="summary-actions" style="display: flex; gap: 5px;">
+                <button class="btn btn-small btn-edit" onclick="shareBrandDetails('${client.client}')">分享明细</button>
+                <button class="btn btn-small btn-edit" onclick="addClientPayment('${client.client}', ${client.payment}, ${client.totalAmount})">添加结款</button>
             </div>
         </div>
         `).join('');
@@ -1562,6 +1564,8 @@ function clearAllRecords() {
             const userData = getUserData();
             userData.incomeRecords = [];
             userData.expenseRecords = [];
+            userData.clientPayments = {}; // 清空客户结款金额
+            userData.paymentLogs = [];     // 清空结款变动日志
             saveUserData(userData);
             
             loadAllData();
@@ -1580,7 +1584,7 @@ function formatDate(dateString) {
 }
 
 // 显示模态框
-function showModal(title, content, onConfirm, onCancel) {
+function showModal(title, content, onConfirm, onCancel, showButtons = true) {
     // 创建模态框背景
     const modalOverlay = document.createElement('div');
     modalOverlay.style.cssText = `
@@ -1603,19 +1607,34 @@ function showModal(title, content, onConfirm, onCancel) {
         border-radius: 8px;
         padding: 20px;
         width: 90%;
-        max-width: 400px;
+        max-width: 500px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     `;
     
     // 模态框内容
-    modal.innerHTML = `
+    let modalContent = `
         <h3 style="margin-top: 0; margin-bottom: 20px;">${title}</h3>
         <div>${content}</div>
-        <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
-            <button id="modalCancel" class="btn btn-small" style="background-color: #95a5a6; color: white; margin-right: auto;">取消</button>
-            <button id="modalConfirm" class="btn btn-small">确认</button>
-        </div>
     `;
+    
+    // 只有当showButtons为true时才添加按钮
+    if (showButtons) {
+        modalContent += `
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="modalCancel" class="btn btn-small" style="background-color: #95a5a6; color: white; margin-right: auto;">取消</button>
+                <button id="modalConfirm" class="btn btn-small">确认</button>
+            </div>
+        `;
+    } else {
+        // 添加一个关闭按钮
+        modalContent += `
+            <div style="margin-top: 20px; text-align: center;">
+                <button id="modalClose" class="btn btn-small" style="background-color: #3498db; color: white;">关闭</button>
+            </div>
+        `;
+    }
+    
+    modal.innerHTML = modalContent;
     
     // 添加到页面
     modalOverlay.appendChild(modal);
@@ -1629,19 +1648,28 @@ function showModal(title, content, onConfirm, onCancel) {
         }
     });
     
-    modal.querySelector('#modalCancel').addEventListener('click', function() {
-        modalOverlay.remove();
-        if (onCancel) onCancel();
-    });
-    
-    modal.querySelector('#modalConfirm').addEventListener('click', function() {
-        if (onConfirm) onConfirm();
-        modalOverlay.remove();
-    });
+    if (showButtons) {
+        // 绑定取消按钮事件
+        modal.querySelector('#modalCancel').addEventListener('click', function() {
+            modalOverlay.remove();
+            if (onCancel) onCancel();
+        });
+        
+        // 绑定确认按钮事件
+        modal.querySelector('#modalConfirm').addEventListener('click', function() {
+            if (onConfirm) onConfirm();
+            modalOverlay.remove();
+        });
+    } else {
+        // 绑定关闭按钮事件
+        modal.querySelector('#modalClose').addEventListener('click', function() {
+            modalOverlay.remove();
+        });
+    }
 }
 
-// 编辑客户结款金额
-function editClientPayment(client, currentPayment, totalAmount) {
+// 添加客户结款金额
+function addClientPayment(client, currentPayment, totalAmount) {
     // 创建模态框元素
     const modalOverlay = document.createElement('div');
     modalOverlay.style.cssText = `
@@ -1668,16 +1696,27 @@ function editClientPayment(client, currentPayment, totalAmount) {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     `;
     
+    // 计算剩余可结金额
+    const remainingAmount = totalAmount - currentPayment;
+    
     // 模态框内容
     modal.innerHTML = `
-        <h3 style="margin-top: 0; margin-bottom: 20px;">修改${client}的结款金额</h3>
+        <h3 style="margin-top: 0; margin-bottom: 20px;">添加${client}的结款金额</h3>
         <div class="form-group" style="margin-bottom: 15px;">
             <label style="display: block; margin-bottom: 5px; font-weight: bold;">当前总计金额:</label>
             <div style="padding: 8px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 3px;">¥${totalAmount.toFixed(2)}</div>
         </div>
         <div class="form-group" style="margin-bottom: 15px;">
-            <label for="newPayment" style="display: block; margin-bottom: 5px; font-weight: bold;">新的结款金额:</label>
-            <input type="number" id="newPayment" step="0.01" min="0" max="${totalAmount}" value="${currentPayment}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 16px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">当前已结金额:</label>
+            <div style="padding: 8px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 3px;">¥${currentPayment.toFixed(2)}</div>
+        </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">剩余可结金额:</label>
+            <div style="padding: 8px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 3px;">¥${remainingAmount.toFixed(2)}</div>
+        </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="addPayment" style="display: block; margin-bottom: 5px; font-weight: bold;">添加结款金额:</label>
+            <input type="number" id="addPayment" step="0.01" min="0" max="${remainingAmount}" placeholder="0.00" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 16px;">
         </div>
         <div class="form-group" style="margin-bottom: 15px;">
             <label for="paymentPassword" style="display: block; margin-bottom: 5px; font-weight: bold;">系统密码:</label>
@@ -1706,22 +1745,25 @@ function editClientPayment(client, currentPayment, totalAmount) {
     
     modal.querySelector('#modalConfirm').addEventListener('click', function() {
         // 在模态框关闭前获取输入值
-        const newPayment = parseFloat(modal.querySelector('#newPayment').value);
+        const addPayment = parseFloat(modal.querySelector('#addPayment').value) || 0;
         const password = modal.querySelector('#paymentPassword').value;
         
         // 验证密码
         if (password !== getSystemPassword()) {
-            showNotification('密码错误，无法修改结款金额');
+            showNotification('密码错误，无法添加结款金额');
             modalOverlay.remove();
             return;
         }
         
         // 验证结款金额
-        if (isNaN(newPayment) || newPayment < 0 || newPayment > totalAmount) {
+        if (isNaN(addPayment) || addPayment < 0 || addPayment > remainingAmount) {
             showNotification('结款金额无效，请重新输入');
             modalOverlay.remove();
             return;
         }
+        
+        // 计算新的结款金额
+        const newPayment = currentPayment + addPayment;
         
         // 更新结款金额
         setClientPayment(client, newPayment);
@@ -1730,7 +1772,7 @@ function editClientPayment(client, currentPayment, totalAmount) {
         loadAllData();
         
         // 显示成功提示
-        showNotification(`已更新${client}的结款金额`);
+        showNotification(`已为${client}添加¥${addPayment.toFixed(2)}的结款金额`);
         
         // 关闭模态框
         modalOverlay.remove();
@@ -1957,35 +1999,83 @@ function updatePaymentLogs() {
         return;
     }
     
-    const logsHtml = logs.map(log => {
-        const changeClass = log.change > 0 ? 'balance-zero' : log.change < 0 ? 'balance-positive' : '';
-        const changeText = log.change > 0 ? `+¥${log.change.toFixed(2)}` : log.change < 0 ? `-¥${Math.abs(log.change).toFixed(2)}` : '¥0.00';
-        
-        return `
-        <div class="summary-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin: 0; font-size: 16px;">${log.client}</h3>
-                <span style="color: #3498db; font-size: 14px;">${log.date} ${log.time}</span>
-            </div>
-            <div class="summary-details">
-                <div class="summary-row">
-                    <span class="summary-label">旧金额:</span>
-                    <span class="summary-value">¥${log.oldAmount.toFixed(2)}</span>
-                </div>
-                <div class="summary-row">
-                    <span class="summary-label">新金额:</span>
-                    <span class="summary-value">¥${log.newAmount.toFixed(2)}</span>
-                </div>
-                <div class="summary-row">
-                    <span class="summary-label">变动:</span>
-                    <span class="summary-value ${changeClass}">${changeText}</span>
-                </div>
-            </div>
-        </div>
-        `;
-    }).join('');
+    // 创建表格标题行
+    const logsHtml = `
+    <div style="overflow-x: auto; margin-bottom: 20px;">
+    <table style="width: 100%; border-collapse: collapse; white-space: nowrap;">
+        <thead>
+            <tr style="background-color: #f8f9fa; border-bottom: 2px solid #3498db;">
+                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 15%;">客户</th>
+                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 10%;">日期</th>
+                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 10%;">时间</th>
+                <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 15%;">旧金额</th>
+                <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 15%;">新金额</th>
+                <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 15%;">变动金额</th>
+                <th style="padding: 12px; text-align: center; font-weight: bold; color: #2c3e50; width: 20%;">操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${logs.map(log => {
+                const changeClass = log.change > 0 ? 'balance-zero' : log.change < 0 ? 'balance-positive' : '';
+                const changeText = log.change > 0 ? `+¥${log.change.toFixed(2)}` : log.change < 0 ? `-¥${Math.abs(log.change).toFixed(2)}` : '¥0.00';
+                
+                return `
+                <tr style="border-bottom: 1px solid #eee; height: 40px;">
+                    <td style="padding: 10px; color: #2c3e50; vertical-align: middle;">${log.client}</td>
+                    <td style="padding: 10px; color: #666; vertical-align: middle;">${log.date}</td>
+                    <td style="padding: 10px; color: #666; vertical-align: middle;">${log.time}</td>
+                    <td style="padding: 10px; text-align: right; color: #666; vertical-align: middle;">¥${log.oldAmount.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right; color: #27ae60; vertical-align: middle;">¥${log.newAmount.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right; color: ${log.change > 0 ? '#27ae60' : log.change < 0 ? '#e74c3c' : '#666'}; vertical-align: middle;">${changeText}</td>
+                    <td style="padding: 10px; text-align: center; vertical-align: middle;">
+                        <button class="btn btn-small btn-delete" onclick="deletePaymentLog('${log.id}')" style="padding: 6px 12px; font-size: 12px; background-color: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; display: inline-block; margin: 0 5px; vertical-align: middle;">删除</button>
+                    </td>
+                </tr>
+                `;
+            }).join('')}
+        </tbody>
+    </table>
+    </div>
+    `;
     
     logsContainer.innerHTML = logsHtml;
+}
+
+// 删除结款日志
+function deletePaymentLog(logId) {
+    // 显示密码输入框
+    showModal('删除确认', `
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="deletePassword" style="display: block; margin-bottom: 5px; font-weight: bold;">请输入系统密码:</label>
+            <input type="password" id="deletePassword" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 16px;">
+        </div>
+    `, function() {
+        const password = document.getElementById('deletePassword').value;
+        
+        // 验证密码
+        if (password !== getSystemPassword()) {
+            showNotification('密码错误，无法删除结款日志');
+            return;
+        }
+        
+        // 获取用户数据
+        const userData = getUserData();
+        
+        // 删除指定ID的日志
+        userData.paymentLogs = userData.paymentLogs.filter(log => log.id !== logId);
+        
+        // 保存用户数据
+        saveUserData(userData);
+        
+        // 重新加载数据
+        loadAllData();
+        
+        // 显示成功提示
+        showNotification('结款日志已删除');
+        
+        // 强制更新结款日志显示
+        updatePaymentLogs();
+    });
 }
 
 // 为记录详情表格添加样式
