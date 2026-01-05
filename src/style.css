@@ -547,13 +547,129 @@ h2 {
     font-size: 14px;
 }
 
-/* 折叠功能样式 */
+/* 结款变动日志 */
 .collapsible-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
     margin-bottom: 0;
+}
+
+/* 结款日志容器样式 */
+#paymentLogsContainer {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    max-height: none !important;
+    padding: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    border: none !important;
+    background-color: white !important;
+}
+
+#paymentLogs {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    border: none !important;
+    padding: 8px !important;
+    background-color: white !important;
+}
+
+#paymentLogs table {
+    width: 100% !important;
+    min-width: 1000px !important;
+    border-collapse: collapse !important;
+    table-layout: auto !important;
+    margin: 0 !important;
+    background-color: white !important;
+}
+
+#paymentLogs table th,
+#paymentLogs table td {
+    padding: 6px 4px !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    min-width: 60px !important;
+    font-size: 14px !important;
+    margin: 0 !important;
+    border: none !important;
+    background-color: transparent !important;
+}
+
+#paymentLogs table th:nth-child(4),
+#paymentLogs table th:nth-child(5),
+#paymentLogs table th:nth-child(6),
+#paymentLogs table td:nth-child(4),
+#paymentLogs table td:nth-child(5),
+#paymentLogs table td:nth-child(6) {
+    text-align: right !important;
+    min-width: 80px !important;
+}
+
+#paymentLogs table th:nth-child(7),
+#paymentLogs table td:nth-child(7) {
+    text-align: center !important;
+    min-width: 80px !important;
+}
+
+#paymentLogs table th {
+    background-color: #f8f9fa !important;
+    font-weight: bold !important;
+    color: #2c3e50 !important;
+    border-bottom: 2px solid #3498db !important;
+}
+
+#paymentLogs table td {
+    border-bottom: 1px solid #eee !important;
+    vertical-align: middle !important;
+}
+
+/* 确保删除按钮正常显示 */
+#paymentLogs table .btn-delete {
+    margin: 0 auto !important;
+    padding: 2px 8px !important;
+    font-size: 11px !important;
+    display: inline-block !important;
+    width: auto !important;
+    height: 22px !important;
+    line-height: 16px !important;
+    flex: none !important;
+    background-color: #e74c3c !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: background-color 0.3s !important;
+    vertical-align: middle !important;
+    box-shadow: none !important;
+}
+
+#paymentLogs table .btn-delete:hover {
+    background-color: #c0392b !important;
+}
+
+/* 修复collapsible-content样式冲突 */
+.collapsible-content#paymentLogsContainer {
+    overflow: auto !important;
+    max-height: none !important;
+    background-color: white !important;
+}
+
+/* 确保summary-section不限制结款日志内容 */
+.summary-section #paymentLogsContainer {
+    width: 100% !important;
+    overflow: auto !important;
+}
+
+.summary-section #paymentLogs {
+    width: 100% !important;
+    overflow: auto !important;
 }
 
 .collapsible-header h2 {
@@ -578,8 +694,8 @@ h2 {
 }
 
 .collapsible-content {
-    max-height: 1000px;
-    overflow: hidden;
+    max-height: 2000px;
+    overflow: auto;
     transition: max-height 0.3s ease-out;
 }
 
