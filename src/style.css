@@ -405,6 +405,7 @@ h2 {
 
 #itemsTable {
     width: 100%;
+    table-layout: auto;
     border-collapse: collapse;
     font-size: 14px;
 }
@@ -414,6 +415,11 @@ h2 {
     padding: 10px;
     text-align: left;
     border-bottom: 1px solid #ddd;
+    vertical-align: middle;
+    word-wrap: break-word;
+    word-break: break-all;
+    white-space: normal;
+    min-width: 60px;
 }
 
 #itemsTable th {
@@ -423,8 +429,10 @@ h2 {
     white-space: nowrap;
 }
 
-#itemsTable td {
-    vertical-align: middle;
+#itemsTable th:last-child,
+#itemsTable td:last-child {
+    white-space: nowrap;
+    min-width: 80px;
 }
 
 #itemsTable input {
@@ -434,24 +442,29 @@ h2 {
     border-radius: 3px;
     font-size: 14px;
     box-sizing: border-box;
+    min-width: 40px;
 }
 
 #itemsTable .item-name {
-    width: 150px;
+    width: 100%;
+    max-width: 200px;
 }
 
 #itemsTable .length,
 #itemsTable .height {
-    width: 80px;
+    width: 100%;
+    max-width: 80px;
 }
 
 #itemsTable .area {
-    width: 90px;
+    width: 100%;
+    max-width: 90px;
 }
 
 #itemsTable .unit-price,
 #itemsTable .subtotal {
-    width: 100px;
+    width: 100%;
+    max-width: 100px;
 }
 
 /* 表格操作 */
