@@ -315,9 +315,19 @@ function getClientPayment(client) {
 function setClientPayment(client, amount) {
     // 直接获取用户数据并更新
     const userData = getUserData();
+    const incomeRecords = getIncomeRecords();
     
-    // 记录旧金额
-    const oldAmount = parseFloat(userData.clientPayments[client] || 0);
+    // 计算该客户的总计金额（所有收入记录的总和）
+    let totalAmount = 0;
+    incomeRecords.forEach(record => {
+        if (record.client === client) {
+            totalAmount += record.totalAmount;
+        }
+    });
+    
+    // 记录旧的结款金额
+    const oldPayment = parseFloat(userData.clientPayments[client] || 0);
+    const oldUnpaid = totalAmount - oldPayment;
     
     // 确保clientPayments对象存在
     if (!userData.clientPayments) {
@@ -327,15 +337,21 @@ function setClientPayment(client, amount) {
     // 更新结款金额
     userData.clientPayments[client] = amount;
     
+    // 计算新的未结金额
+    const newUnpaid = totalAmount - amount;
+    
     // 记录变动日志
     const logEntry = {
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
         time: new Date().toLocaleTimeString(),
         client: client,
-        oldAmount: oldAmount,
-        newAmount: amount,
-        change: amount - oldAmount
+        totalAmount: totalAmount, // 客户汇总中的总计金额
+        oldPayment: oldPayment,    // 旧的结款金额
+        newPayment: amount,        // 新的结款金额
+        oldUnpaid: oldUnpaid,      // 旧的未结金额
+        newUnpaid: newUnpaid,      // 新的未结金额
+        change: amount - oldPayment // 变动金额
     };
     
     // 添加到日志
@@ -350,7 +366,11 @@ function setClientPayment(client, amount) {
     // 直接重新计算并更新页面
     updateAnnualSummary();
     updateBrandSummary();
-    updateClientSummary(getIncomeRecords());
+    updateClientSummary(incomeRecords);
+    updatePaymentLogs();
+    
+    // 重新加载所有数据，确保所有页面都能及时更新
+    loadAllData();
 }
 
 // 获取结款变动日志
@@ -398,6 +418,9 @@ function loadAllData() {
     const expenseRecords = getExpenseRecords();
     displayExpenseRecords(expenseRecords);
     updateExpenseSummary();
+    
+    // 加载结款日志
+    updatePaymentLogs();
 }
 
 // 表格行管理
@@ -910,7 +933,7 @@ function deleteIncomeRecord(id) {
             const password = document.getElementById('deletePassword').value;
             
             // 验证密码
-            if (password !== '123456') {
+            if (password !== getSystemPassword()) {
                 showNotification('密码错误，无法删除记录');
                 return;
             }
@@ -1001,19 +1024,34 @@ function displayExpenseRecords(records) {
     // 获取当前页的数据
     const currentPageData = getCurrentPageData(records, paginationConfig.currentPage, paginationConfig.recordsPerPage);
     
-    const recordsHtml = currentPageData.map(record => `
-        <div class="expense-item" data-id="${record.id}">
-            <div class="expense-header">
-                <span class="expense-date">${formatDate(record.date)}</span>
-                <span class="expense-amount">¥${record.amount.toFixed(2)}</span>
-            </div>
-            <div class="expense-item-name">${record.item}</div>
-            ${record.note ? `<div class="expense-note">${record.note}</div>` : ''}
-            <div class="record-actions">
-                <button class="btn btn-small btn-delete" onclick="deleteExpenseRecord('${record.id}')">删除</button>
-            </div>
+    const recordsHtml = `
+        <div style="overflow-x: auto; margin-bottom: 20px;">
+        <table style="width: 100%; border-collapse: collapse; white-space: nowrap;">
+            <thead>
+                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #3498db;">
+                    <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 15%;">日期</th>
+                    <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 25%;">支出项目</th>
+                    <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 15%;">支出金额</th>
+                    <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 25%;">备注</th>
+                    <th style="padding: 12px; text-align: center; font-weight: bold; color: #2c3e50; width: 20%;">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${currentPageData.map(record => `
+                    <tr style="border-bottom: 1px solid #eee; height: 40px;">
+                        <td style="padding: 10px; color: #666; vertical-align: middle;">${formatDate(record.date)}</td>
+                        <td style="padding: 10px; color: #2c3e50; vertical-align: middle;">${record.item}</td>
+                        <td style="padding: 10px; text-align: right; color: #e74c3c; font-weight: bold; vertical-align: middle;">¥${record.amount.toFixed(2)}</td>
+                        <td style="padding: 10px; color: #666; vertical-align: middle;">${record.note || '-'}</td>
+                        <td style="padding: 10px; text-align: center; vertical-align: middle;">
+                            <button class="btn btn-small btn-delete" onclick="deleteExpenseRecord('${record.id}')" style="padding: 6px 12px; font-size: 12px; background-color: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; display: inline-block; margin: 0 5px; vertical-align: middle;">删除</button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
         </div>
-    `).join('');
+    `;
     
     recordsList.innerHTML = recordsHtml;
     
@@ -1023,13 +1061,28 @@ function displayExpenseRecords(records) {
 
 // 删除支出记录
 function deleteExpenseRecord(id) {
-    if (confirm('确定要删除这条支出记录吗？')) {
+    // 显示密码输入框
+    showModal('删除确认', `
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label for="deletePassword" style="display: block; margin-bottom: 5px; font-weight: bold;">请输入系统密码:</label>
+            <input type="password" id="deletePassword" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 16px;">
+        </div>
+    `, function() {
+        const password = document.getElementById('deletePassword').value;
+        
+        // 验证密码
+        if (password !== getSystemPassword()) {
+            showNotification('密码错误，无法删除支出记录');
+            return;
+        }
+        
+        // 执行删除操作
         const records = getExpenseRecords();
         const updatedRecords = records.filter(record => record.id !== id);
         saveExpenseRecords(updatedRecords);
         loadAllData();
         showNotification('支出记录已删除');
-    }
+    });
 }
 
 // 统计和汇总
@@ -1037,16 +1090,29 @@ function deleteExpenseRecord(id) {
 // 更新年度总计
 function updateAnnualSummary() {
     const records = getIncomeRecords();
+    const expenseRecords = getExpenseRecords();
     const currentYear = new Date().getFullYear();
     
-    // 筛选今年的记录
-    const thisYearRecords = records.filter(record => {
+    // 筛选今年的收入记录
+    const thisYearIncomeRecords = records.filter(record => {
         const recordYear = new Date(record.date).getFullYear();
         return recordYear === currentYear;
     });
     
-    // 计算年度总计
-    const annualTotal = thisYearRecords.reduce((sum, record) => sum + record.totalAmount, 0);
+    // 筛选今年的支出记录
+    const thisYearExpenseRecords = expenseRecords.filter(record => {
+        const recordYear = new Date(record.date).getFullYear();
+        return recordYear === currentYear;
+    });
+    
+    // 计算年度总收入
+    const annualIncome = thisYearIncomeRecords.reduce((sum, record) => sum + record.totalAmount, 0);
+    
+    // 计算年度支出总计
+    const annualExpense = thisYearExpenseRecords.reduce((sum, record) => sum + record.amount, 0);
+    
+    // 计算年度总计（总收入-年度支出）
+    const annualTotal = annualIncome - annualExpense;
     
     // 计算年度已结款和未结款
     const clientPayments = getClientPayments();
@@ -1054,7 +1120,7 @@ function updateAnnualSummary() {
     
     // 按客户分组计算总计
     const clientTotals = {};
-    thisYearRecords.forEach(record => {
+    thisYearIncomeRecords.forEach(record => {
         if (!clientTotals[record.client]) {
             clientTotals[record.client] = 0;
         }
@@ -1068,7 +1134,7 @@ function updateAnnualSummary() {
         annualPaid += Math.min(payment, clientTotals[client]);
     });
     
-    const annualUnpaid = annualTotal - annualPaid;
+    const annualUnpaid = annualIncome - annualPaid;
     
     // 更新显示
     document.getElementById('annualTotal').textContent = `¥${annualTotal.toFixed(2)}`;
@@ -1437,8 +1503,7 @@ function updateClientSummary(records) {
             payment,
             balance
         };
-    }).filter(client => client.balance > 0) // 只保留未结金额大于0的客户
-      .sort((a, b) => b.balance - a.balance); // 按未结金额从大到小排序
+    }).filter(client => client.balance > 0); // 只保留未结金额大于0的客户，不再排序
     
     if (activeClients.length === 0) {
         clientSummary.innerHTML = '<div class="empty-state">暂无未结款客户记录</div>';
@@ -1987,6 +2052,36 @@ function switchTab(tabName) {
     
     // 添加当前标签页按钮的激活状态
     event.target.classList.add('active');
+    
+    // 根据标签页名称更新对应数据
+    const incomeRecords = getIncomeRecords();
+    const expenseRecords = getExpenseRecords();
+    
+    switch(tabName) {
+        case 'dashboard':
+            // 仪表盘需要更新年度总计、品牌汇总等
+            updateAnnualSummary();
+            updateBrandSummary();
+            updateClientSummary(incomeRecords);
+            break;
+        case 'client-summary':
+            // 客户汇总需要更新客户汇总数据
+            updateClientSummary(incomeRecords);
+            break;
+        case 'income-records':
+            // 收入记录需要更新收入记录列表
+            displayIncomeRecords(incomeRecords);
+            break;
+        case 'payment-logs':
+            // 结款日志需要更新结款日志列表
+            updatePaymentLogs();
+            break;
+        case 'expense-management':
+            // 支出管理需要更新支出记录和支出汇总
+            displayExpenseRecords(expenseRecords);
+            updateExpenseSummary();
+            break;
+    }
 }
 
 // 更新结款变动日志显示
@@ -1999,19 +2094,20 @@ function updatePaymentLogs() {
         return;
     }
     
+    // 获取当前的收入记录，用于计算当前的总计金额和未结金额
+    const currentIncomeRecords = getIncomeRecords();
+    
     // 创建表格标题行
     const logsHtml = `
     <div style="overflow-x: auto; margin-bottom: 20px;">
     <table style="width: 100%; border-collapse: collapse; white-space: nowrap;">
         <thead>
             <tr style="background-color: #f8f9fa; border-bottom: 2px solid #3498db;">
-                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 15%;">客户</th>
-                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 10%;">日期</th>
-                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 10%;">时间</th>
-                <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 15%;">旧金额</th>
-                <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 15%;">新金额</th>
-                <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 15%;">变动金额</th>
-                <th style="padding: 12px; text-align: center; font-weight: bold; color: #2c3e50; width: 20%;">操作</th>
+                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 20%;">客户</th>
+                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 15%;">日期</th>
+                <th style="padding: 12px; text-align: left; font-weight: bold; color: #2c3e50; width: 15%;">时间</th>
+                <th style="padding: 12px; text-align: right; font-weight: bold; color: #2c3e50; width: 25%;">变动金额</th>
+                <th style="padding: 12px; text-align: center; font-weight: bold; color: #2c3e50; width: 25%;">操作</th>
             </tr>
         </thead>
         <tbody>
@@ -2024,9 +2120,7 @@ function updatePaymentLogs() {
                     <td style="padding: 10px; color: #2c3e50; vertical-align: middle;">${log.client}</td>
                     <td style="padding: 10px; color: #666; vertical-align: middle;">${log.date}</td>
                     <td style="padding: 10px; color: #666; vertical-align: middle;">${log.time}</td>
-                    <td style="padding: 10px; text-align: right; color: #666; vertical-align: middle;">¥${log.oldAmount.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: right; color: #27ae60; vertical-align: middle;">¥${log.newAmount.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: right; color: ${log.change > 0 ? '#27ae60' : log.change < 0 ? '#e74c3c' : '#666'}; vertical-align: middle;">${changeText}</td>
+                    <td style="padding: 10px; text-align: right; color: ${log.change > 0 ? '#27ae60' : log.change < 0 ? '#e74c3c' : '#666'}; font-weight: bold; vertical-align: middle;">${changeText}</td>
                     <td style="padding: 10px; text-align: center; vertical-align: middle;">
                         <button class="btn btn-small btn-delete" onclick="deletePaymentLog('${log.id}')" style="padding: 6px 12px; font-size: 12px; background-color: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; display: inline-block; margin: 0 5px; vertical-align: middle;">删除</button>
                     </td>
@@ -2088,6 +2182,7 @@ style.textContent = `
     
     .record-items-table {
         width: 100%;
+        table-layout: auto;
         border-collapse: collapse;
         font-size: 14px;
         background-color: white;
@@ -2099,6 +2194,17 @@ style.textContent = `
         padding: 8px 12px;
         text-align: left;
         border-bottom: 1px solid #ddd;
+        word-wrap: break-word;
+        word-break: break-all;
+        white-space: normal;
+        min-width: 60px;
+        max-width: 200px;
+    }
+    
+    .record-items-table th:first-child,
+    .record-items-table td:first-child {
+        min-width: 100px;
+        max-width: 250px;
     }
     
     .record-items-table th {
