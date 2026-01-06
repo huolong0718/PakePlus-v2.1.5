@@ -1,5 +1,16 @@
 // 安装收入记账APP JavaScript
 
+// 导入Node.js模块用于文件操作
+const fs = require('fs');
+const path = require('path');
+
+// 获取应用安装目录（EXE所在目录）
+const appDir = path.dirname(process.execPath);
+
+// 数据文件路径
+const usersFilePath = path.join(appDir, 'users.json');
+const savedLoginInfoPath = path.join(appDir, 'savedLoginInfo.json');
+
 // 当前登录用户
 let currentUser = null;
 
@@ -17,18 +28,33 @@ let filteredExpenseRecords = [];
 
 // 用户认证管理
 
+// 获取用户数据文件路径
+function getUserDataPath(username) {
+    return path.join(appDir, `userData_${username}.json`);
+}
+
 // 获取用户列表
 function getUsers() {
-    const usersJson = localStorage.getItem('users');
-    return usersJson ? JSON.parse(usersJson) : {};
+    try {
+        if (fs.existsSync(usersFilePath)) {
+            const usersJson = fs.readFileSync(usersFilePath, 'utf8');
+            return JSON.parse(usersJson);
+        }
+        return {};
+    } catch (error) {
+        console.error('读取用户列表失败:', error);
+        return {};
+    }
 }
 
 // 保存用户列表
 function saveUsers(users) {
-    localStorage.setItem('users', JSON.stringify(users));
+    try {
+        fs.writeFileSync(usersFilePath, JSON.stringify(users, null, 2), 'utf8');
+    } catch (error) {
+        console.error('保存用户列表失败:', error);
+    }
 }
-
-
 
 // 检查用户是否存在
 function userExists(username) {
@@ -61,42 +87,75 @@ function initializeUserData(username) {
         paymentLogs: [],
         systemPassword: '123456'
     };
-    localStorage.setItem(`userData_${username}`, JSON.stringify(userData));
+    try {
+        fs.writeFileSync(getUserDataPath(username), JSON.stringify(userData, null, 2), 'utf8');
+    } catch (error) {
+        console.error('初始化用户数据失败:', error);
+    }
 }
 
 // 获取用户数据
 function getUserData() {
     if (!currentUser) return null;
     
-    const userDataJson = localStorage.getItem(`userData_${currentUser}`);
-    if (!userDataJson) {
-        initializeUserData(currentUser);
-        return getUserData();
+    try {
+        const userDataPath = getUserDataPath(currentUser);
+        if (fs.existsSync(userDataPath)) {
+            const userDataJson = fs.readFileSync(userDataPath, 'utf8');
+            return JSON.parse(userDataJson);
+        } else {
+            initializeUserData(currentUser);
+            return getUserData();
+        }
+    } catch (error) {
+        console.error('读取用户数据失败:', error);
+        return null;
     }
-    
-    return JSON.parse(userDataJson);
 }
 
 // 保存用户数据
 function saveUserData(userData) {
     if (!currentUser) return;
-    localStorage.setItem(`userData_${currentUser}`, JSON.stringify(userData));
+    
+    try {
+        fs.writeFileSync(getUserDataPath(currentUser), JSON.stringify(userData, null, 2), 'utf8');
+    } catch (error) {
+        console.error('保存用户数据失败:', error);
+    }
 }
 
 // 获取保存的登录信息
 function getSavedLoginInfo() {
-    const savedInfoJson = localStorage.getItem('savedLoginInfo');
-    return savedInfoJson ? JSON.parse(savedInfoJson) : null;
+    try {
+        if (fs.existsSync(savedLoginInfoPath)) {
+            const savedInfoJson = fs.readFileSync(savedLoginInfoPath, 'utf8');
+            return JSON.parse(savedInfoJson);
+        }
+        return null;
+    } catch (error) {
+        console.error('读取登录信息失败:', error);
+        return null;
+    }
 }
 
 // 保存登录信息
 function saveLoginInfo(username, password) {
-    localStorage.setItem('savedLoginInfo', JSON.stringify({ username, password }));
+    try {
+        fs.writeFileSync(savedLoginInfoPath, JSON.stringify({ username, password }, null, 2), 'utf8');
+    } catch (error) {
+        console.error('保存登录信息失败:', error);
+    }
 }
 
 // 清除保存的登录信息
 function clearSavedLoginInfo() {
-    localStorage.removeItem('savedLoginInfo');
+    try {
+        if (fs.existsSync(savedLoginInfoPath)) {
+            fs.unlinkSync(savedLoginInfoPath);
+        }
+    } catch (error) {
+        console.error('清除登录信息失败:', error);
+    }
 }
 
 // 初始化应用
